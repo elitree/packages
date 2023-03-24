@@ -1,3 +1,7 @@
+## 0.4.1
+
+* Initial support for custom overlays. [#98596](https://github.com/flutter/flutter/issues/98596).
+
 ## 0.4.0+7
 
 * Clarifies explanation of endorsement in README.
@@ -7,10 +11,6 @@
 
 * Updates links for the merge of flutter/plugins into flutter/packages.
 * Updates minimum Flutter version to 3.0.
-
-## 0.4.1
-
-* Initial support for custom overlays. [#98596](https://github.com/flutter/flutter/issues/98596).
 
 ## 0.4.0+5
 
