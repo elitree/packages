@@ -5,10 +5,13 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart';
 
+
+import '../../lib/google_maps_flutter_platform_interface.dart';
+
 class _TestTileProvider extends TileProvider {
   @override
   Future<Tile> getTile(int x, int y, int? zoom) async {
-    return const Tile(0, 0, null);
+    return const EncodedTile(0, 0, null);
   }
 }
 

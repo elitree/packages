@@ -25,28 +25,32 @@ class TileOverlayController {
       return null;
     }
 
-    final ImageElement img =
-        ownerDocument!.createElement('img') as ImageElement;
-    img.width = img.height = logicalTileSize;
-    img.hidden = true;
-    _tileOverlay.tileProvider!
-        .getTile(tileCoord!.x!.toInt(), tileCoord.y!.toInt(), zoom?.toInt())
-        .then((Tile tile) async {
-      if (tile.data == null) {
-        return;
-      }
+    final DivElement div = ownerDocument!.createElement('div') as DivElement;
+     _tileOverlay.tileProvider!
+         .getTile(tileCoord!.x!.toInt(), tileCoord.y!.toInt(), zoom?.toInt())
+         .then((Tile tile) async {
+       if (tile is ImageTile && tile.image is WebImage) {
+         final canvas = (tile.image as WebImage).source as Element;
+         canvas.style.width = canvas.style.height = '${logicalTileSize}px';
+         div.children = [canvas];
+       } else {
+         final encoded = await tile.asEncodedTile();
+         if (encoded.data == null) {
+           return;
+         }
 
-      // Using img lets us take advantage of native decoding.
-      final String src = Url.createObjectUrl(Blob(<dynamic>[tile.data]));
-      // Spurious linter warning in legacy analyzer. (google/pedantic#83)
-      // ignore: unsafe_html
-      img.src = src;
-      await img.decode();
-      img.hidden = false;
-      Url.revokeObjectUrl(src);
-    });
-    return img;
-  }
+         // Using img lets us take advantage of native decoding.
+         final img = ownerDocument.createElement('img') as ImageElement;
+         img.width = img.height = logicalTileSize;
+         final String src = Url.createObjectUrl(Blob(<dynamic>[encoded.data]));
+         img.src = src;
+         await img.decode();
+         div.children = [img];
+         Url.revokeObjectUrl(src);
+       }
+     });
+     return div;
+   }
 
   /// The [gmaps.MapType] produced by this controller.
   gmaps.MapType get gmMapType => _gmMapType;

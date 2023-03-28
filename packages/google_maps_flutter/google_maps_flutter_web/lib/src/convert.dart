@@ -74,7 +74,7 @@ gmaps.MapOptions _configurationAndStyleToGmapsOptions(
       configuration.zoomGesturesEnabled == false) {
     options.gestureHandling = 'none';
   } else {
-    options.gestureHandling = 'auto';
+    options.gestureHandling = 'greedy';
   }
 
   // These don't have any configuration entries, but they seem to be off in the
@@ -250,7 +250,8 @@ gmaps.Size? _gmSizeFromIconConfig(List<Object?> iconConfig, int sizeIndex) {
 }
 
 // Converts a [BitmapDescriptor] into a [gmaps.Icon] that can be used in Markers.
-gmaps.Icon? _gmIconFromBitmapDescriptor(BitmapDescriptor bitmapDescriptor) {
+gmaps.Icon? _gmIconFromBitmapDescriptor(
+     BitmapDescriptor bitmapDescriptor, Offset anchor) {
   final List<Object?> iconConfig = bitmapDescriptor.toJson() as List<Object?>;
 
   gmaps.Icon? icon;
@@ -285,7 +286,11 @@ gmaps.Icon? _gmIconFromBitmapDescriptor(BitmapDescriptor bitmapDescriptor) {
     }
   }
 
-  return icon;
+  return icon
+     ?..anchor = icon.size == null
+         ? null
+         : gmaps.Point(
+             anchor.dx * icon.size!.width!, anchor.dy * icon.size!.height!);
 }
 
 // Computes the options for a new [gmaps.Marker] from an incoming set of options
@@ -296,17 +301,16 @@ gmaps.MarkerOptions _markerOptionsFromMarker(
   gmaps.Marker? currentMarker,
 ) {
   return gmaps.MarkerOptions()
-    ..position = currentMarker?.position ??
-        gmaps.LatLng(
-          marker.position.latitude,
-          marker.position.longitude,
-        )
+    ..position = gmaps.LatLng(
+       marker.position.latitude,
+       marker.position.longitude,
+     )
     ..title = sanitizeHtml(marker.infoWindow.title ?? '')
     ..zIndex = marker.zIndex
     ..visible = marker.visible
     ..opacity = marker.alpha
     ..draggable = marker.draggable
-    ..icon = _gmIconFromBitmapDescriptor(marker.icon);
+    ..icon = _gmIconFromBitmapDescriptor(marker.icon, marker.anchor);
   // TODO(ditman): Compute anchor properly, otherwise infowindows attach to the wrong spot.
   // Flat and Rotation are not supported directly on the web.
 }
@@ -420,30 +424,43 @@ gmaps.PolylineOptions _polylineOptionsFromPolyline(
 //  this.width = 10,
 }
 
+ // Casts [value] to a JSON dictionary (string -> nullable object). [value]
+ // must be a non-null JSON dictionary.
+ Map<String, Object?> asJsonObject(dynamic value) {
+   return (value as Map<Object?, Object?>).cast<String, Object?>();
+ }
+
+ // Casts [value] to a JSON list. [value] must be a non-null JSON list.
+ List<Object?> asJsonList(dynamic value) {
+   return value as List<Object?>;
+ }
+
 // Translates a [CameraUpdate] into operations on a [gmaps.GMap].
-void _applyCameraUpdate(gmaps.GMap map, CameraUpdate update) {
-  // Casts [value] to a JSON dictionary (string -> nullable object). [value]
-  // must be a non-null JSON dictionary.
-  Map<String, Object?> asJsonObject(dynamic value) {
-    return (value as Map<Object?, Object?>).cast<String, Object?>();
-  }
-
-  // Casts [value] to a JSON list. [value] must be a non-null JSON list.
-  List<Object?> asJsonList(dynamic value) {
-    return value as List<Object?>;
-  }
-
-  final List<dynamic> json = update.toJson() as List<dynamic>;
-  switch (json[0]) {
-    case 'newCameraPosition':
-      final Map<String, Object?> position = asJsonObject(json[1]);
-      final List<Object?> latLng = asJsonList(position['target']);
-      map.heading = position['bearing'] as num?;
-      map.zoom = position['zoom'] as num?;
-      map.panTo(
-        gmaps.LatLng(latLng[0] as num?, latLng[1] as num?),
-      );
-      map.tilt = position['tilt'] as num?;
+void _applyCameraUpdate(gmaps.GMap map, CameraUpdate update,
+     {required bool animate}) {
+   final List<dynamic> json = update.toJson() as List<dynamic>;
+   switch (json[0]) {
+     case 'newCameraPosition':
+       if (animate) {
+         map.heading = json[1]['bearing'] as num?;
+         map.zoom = json[1]['zoom'] as num?;
+         map.panTo(
+           gmaps.LatLng(
+             json[1]['target'][0] as num?,
+             json[1]['target'][1] as num?,
+           ),
+         );
+         map.tilt = json[1]['tilt'] as num?;
+       } else {
+         map.moveCamera(gmaps.CameraOptions()
+           ..heading = json[1]['bearing'] as num?
+           ..zoom = json[1]['zoom'] as num?
+           ..center = gmaps.LatLng(
+             json[1]['target'][0] as num?,
+             json[1]['target'][1] as num?,
+           )
+           ..tilt = json[1]['tilt'] as num?);
+       }
       break;
     case 'newLatLng':
       final List<Object?> latLng = asJsonList(json[1]);
