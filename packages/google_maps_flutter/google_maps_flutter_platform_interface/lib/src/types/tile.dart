@@ -74,9 +74,10 @@ import 'dart:typed_data';
      final data =
          await image.toByteData(format: ImageByteFormat.rawStraightRgba);
      final imgImage =
-         img.Image.fromBytes(width, height, data!.buffer.asUint8List());
+        //  img.Image.fromBytes(width, height, data!.buffer.asUint8List());
+        img.Image.fromBytes(width: width, height: height, bytes: data!.buffer);
      final encoded = EncodedTile(
-         width, height, Uint8List.fromList(_encoder.encodeImage(imgImage)));
+         width, height, Uint8List.fromList(_encoder.encode(imgImage)));
      // TODO: This is obviously nonobvious and we should make things clearer to move this out of prototype.
      image.dispose();
      return encoded;
