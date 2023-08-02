@@ -67,7 +67,7 @@ gmaps.MapOptions _configurationAndStyleToGmapsOptions(
     // Old behavior
     options.gestureHandling = WebGestureHandling.none.name;
   } else {
-    options.gestureHandling = WebGestureHandling.auto.name;
+    options.gestureHandling = WebGestureHandling.greedy.name;
   }
 
   if (configuration.fortyFiveDegreeImageryEnabled != null) {
