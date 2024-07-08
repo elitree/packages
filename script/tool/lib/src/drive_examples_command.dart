@@ -16,7 +16,7 @@ import 'common/repository_package.dart';
 const int _exitNoPlatformFlags = 2;
 const int _exitNoAvailableDevice = 3;
 
-// From https://docs.flutter.dev/testing/integration-tests#running-in-a-browser
+// From https://flutter.dev/to/integration-test-on-web
 const int _chromeDriverPort = 4444;
 
 /// A command to run the integration tests for a package's example applications.
@@ -119,6 +119,7 @@ class DriveExamplesCommand extends PackageLoopingCommand {
           'web-server',
           '--web-port=7357',
           '--browser-name=chrome',
+          '--web-renderer=html',
           if (platform.environment.containsKey('CHROME_EXECUTABLE'))
             '--chrome-binary=${platform.environment['CHROME_EXECUTABLE']}',
         ],
@@ -404,8 +405,10 @@ class DriveExamplesCommand extends PackageLoopingCommand {
     // Workaround for https://github.com/flutter/flutter/issues/135673
     // Once that is fixed on stable, this logic can be removed and the command
     // can always just be run with "integration_test".
-    final bool needsMultipleInvocations =
-        testFiles.length > 1 && getBoolArg(platformMacOS);
+    final bool needsMultipleInvocations = testFiles.length > 1 &&
+        (getBoolArg(platformLinux) ||
+            getBoolArg(platformMacOS) ||
+            getBoolArg(platformWindows));
     final Iterable<String> individualRunTargets = needsMultipleInvocations
         ? testFiles
             .map((File f) => getRelativePosixPath(f, from: example.directory))

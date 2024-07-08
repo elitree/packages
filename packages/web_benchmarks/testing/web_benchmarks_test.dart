@@ -26,20 +26,24 @@ Future<void> main() async {
     );
   }, timeout: Timeout.none);
 
-  test('Can run a web benchmark with wasm', () async {
-    await _runBenchmarks(
-      benchmarkNames: <String>['simple'],
-      entryPoint: 'lib/benchmarks/runner_simple.dart',
-      compilationOptions: const CompilationOptions(useWasm: true),
-    );
-  }, timeout: Timeout.none);
+  test(
+    'Can run a web benchmark with wasm',
+    () async {
+      await _runBenchmarks(
+        benchmarkNames: <String>['simple'],
+        entryPoint: 'lib/benchmarks/runner_simple.dart',
+        compilationOptions: const CompilationOptions.wasm(),
+      );
+    },
+    timeout: Timeout.none,
+  );
 }
 
 Future<void> _runBenchmarks({
   required List<String> benchmarkNames,
   required String entryPoint,
   String initialPage = defaultInitialPage,
-  CompilationOptions compilationOptions = const CompilationOptions(),
+  CompilationOptions compilationOptions = const CompilationOptions.js(),
 }) async {
   final BenchmarkResults taskResult = await serveWebBenchmark(
     benchmarkAppDirectory: Directory('testing/test_app'),
