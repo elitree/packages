@@ -171,39 +171,6 @@ ${warningsConfigured ? warningConfig : ''}
 
   /// Writes a fake android/build.gradle file for an example [package] with the
   /// given options.
-  void writeFakeExampleTopLevelSettingsGradle(
-    RepositoryPackage package, {
-    bool includeArtifactHub = true,
-    bool includeArtifactDocumentation = true,
-  }) {
-    final File settingsGradle = package
-        .platformDirectory(FlutterPlatform.android)
-        .childFile('settings.gradle');
-    settingsGradle.createSync(recursive: true);
-
-    settingsGradle.writeAsStringSync('''
-include ':app'
-
-def flutterProjectRoot = rootProject.projectDir.parentFile.toPath()
-
-def plugins = new Properties()
-def pluginsFile = new File(flutterProjectRoot.toFile(), '.flutter-plugins')
-if (pluginsFile.exists()) {
-    pluginsFile.withInputStream { stream -> plugins.load(stream) }
-}
-
-plugins.each { name, path ->
-    def pluginDirectory = flutterProjectRoot.resolve(path).resolve('android').toFile()
-    include ":\$name"
-    project(":\$name").projectDir = pluginDirectory
-}
-${includeArtifactDocumentation ? '// See ${GradleCheckCommand.artifactHubDocumentationString} for more info.' : ''}
-${includeArtifactHub ? GradleCheckCommand.exampleRootSettingsArtifactHubString : ''}
-''');
-  }
-
-  /// Writes a fake android/build.gradle file for an example [package] with the
-  /// given options.
   void writeFakeExampleSettingsGradle(
     RepositoryPackage package, {
     bool includeArtifactHub = true,
@@ -216,8 +183,7 @@ ${includeArtifactHub ? GradleCheckCommand.exampleRootSettingsArtifactHubString :
 
     /// String printed as a valid example of settings.gradle repository
     /// configuration without the artifact hub env variable.
-    /// GP stands for the gradle plugin method of flutter tooling inclusion.
-    const String exampleSettingsWithoutArtifactHubStringGP = '''
+    const String exampleSettingsWithoutArtifactHubString = '''
 plugins {
     id "dev.flutter.flutter-plugin-loader" version "1.0.0"
     // ...other plugins
@@ -244,7 +210,7 @@ pluginManagement {
 }
 
 ${includeArtifactDocumentation ? '// See ${GradleCheckCommand.artifactHubDocumentationString} for more info.' : ''}
-${includeArtifactHub ? GradleCheckCommand.exampleSettingsArtifactHubStringGP : exampleSettingsWithoutArtifactHubStringGP}
+${includeArtifactHub ? GradleCheckCommand.exampleSettingsArtifactHubString : exampleSettingsWithoutArtifactHubString}
 include ":app"
 ''');
   }
@@ -255,6 +221,7 @@ include ":app"
     RepositoryPackage package, {
     required bool includeNamespace,
     required bool commentNamespace,
+    required bool includeNameSpaceAsDeclaration,
   }) {
     final File buildGradle = package
         .platformDirectory(FlutterPlatform.android)
@@ -263,7 +230,7 @@ include ":app"
     buildGradle.createSync(recursive: true);
 
     final String namespace =
-        "${commentNamespace ? '// ' : ''}namespace '$_defaultFakeNamespace'";
+        "${commentNamespace ? '// ' : ''}namespace ${includeNameSpaceAsDeclaration ? '= ' : ''}'$_defaultFakeNamespace'";
     buildGradle.writeAsStringSync('''
 def flutterRoot = localProperties.getProperty('flutter.sdk')
 if (flutterRoot == null) {
@@ -303,6 +270,7 @@ dependencies {
     required String pluginName,
     bool includeNamespace = true,
     bool commentNamespace = false,
+    bool includeNameSpaceAsDeclaration = false,
     bool warningsConfigured = true,
     String? kotlinVersion,
     bool includeBuildArtifactHub = true,
@@ -317,34 +285,9 @@ dependencies {
       includeArtifactHub: includeBuildArtifactHub,
     );
     writeFakeExampleAppBuildGradle(package,
-        includeNamespace: includeNamespace, commentNamespace: commentNamespace);
-    writeFakeExampleTopLevelSettingsGradle(
-      package,
-      includeArtifactHub: includeSettingsArtifactHub,
-      includeArtifactDocumentation: includeSettingsDocumentationArtifactHub,
-    );
-  }
-
-  void writeFakeExampleBuildGradleGP(
-    RepositoryPackage package, {
-    required String pluginName,
-    bool includeNamespace = true,
-    bool commentNamespace = false,
-    bool warningsConfigured = true,
-    String? kotlinVersion,
-    required bool includeBuildArtifactHub,
-    required bool includeSettingsArtifactHub,
-    required bool includeSettingsDocumentationArtifactHub,
-  }) {
-    writeFakeExampleTopLevelBuildGradle(
-      package,
-      pluginName: pluginName,
-      warningsConfigured: warningsConfigured,
-      kotlinVersion: kotlinVersion,
-      includeArtifactHub: includeBuildArtifactHub,
-    );
-    writeFakeExampleAppBuildGradle(package,
-        includeNamespace: includeNamespace, commentNamespace: commentNamespace);
+        includeNamespace: includeNamespace,
+        commentNamespace: commentNamespace,
+        includeNameSpaceAsDeclaration: includeNameSpaceAsDeclaration);
     writeFakeExampleSettingsGradle(
       package,
       includeArtifactHub: includeSettingsArtifactHub,
@@ -659,6 +602,30 @@ dependencies {
     );
   });
 
+  test('passes when namespace is declared with "=" declaration', () async {
+    const String pluginName = 'a_plugin';
+    final RepositoryPackage package = createFakePlugin(pluginName, packagesDir);
+    writeFakePluginBuildGradle(package, includeLanguageVersion: true);
+    writeFakeManifest(package);
+    final RepositoryPackage example = package.getExamples().first;
+    writeFakeExampleBuildGradles(example,
+        pluginName: pluginName, includeNameSpaceAsDeclaration: true);
+    writeFakeManifest(example, isApp: true);
+
+    final List<String> output = await runCapturingPrint(
+        runner, <String>['gradle-check'], errorHandler: (Error e) {
+      print((e as ToolExit).stackTrace);
+    });
+
+    expect(
+        output,
+        containsAllInOrder(
+          <Matcher>[
+            contains('Validating android/app/build.gradle'),
+          ],
+        ));
+  });
+
   test('fails if gradle-driven lint-warnings-as-errors is missing', () async {
     const String pluginName = 'a_plugin';
     final RepositoryPackage plugin =
@@ -796,7 +763,7 @@ dependencies {
         output,
         containsAllInOrder(<Matcher>[
           contains(GradleCheckCommand.exampleRootGradleArtifactHubString),
-          contains(GradleCheckCommand.exampleRootSettingsArtifactHubString),
+          contains(GradleCheckCommand.exampleSettingsArtifactHubString),
         ]),
       );
     });
@@ -828,11 +795,6 @@ dependencies {
           contains(GradleCheckCommand.exampleRootGradleArtifactHubString),
         ]),
       );
-      expect(
-        output,
-        isNot(
-            contains(GradleCheckCommand.exampleRootSettingsArtifactHubString)),
-      );
     });
 
     test('fails settings.gradle artifact hub check when missing', () async {
@@ -859,7 +821,7 @@ dependencies {
       expect(
         output,
         containsAllInOrder(<Matcher>[
-          contains(GradleCheckCommand.exampleRootSettingsArtifactHubString),
+          contains(GradleCheckCommand.exampleSettingsArtifactHubString),
         ]),
       );
       expect(
@@ -876,10 +838,12 @@ dependencies {
       writeFakePluginBuildGradle(package, includeLanguageVersion: true);
       writeFakeManifest(package);
       final RepositoryPackage example = package.getExamples().first;
-      writeFakeExampleBuildGradleGP(example,
+      writeFakeExampleBuildGradles(example,
           pluginName: packageName,
+          // ignore: avoid_redundant_argument_values
           includeBuildArtifactHub: true,
           includeSettingsArtifactHub: false,
+          // ignore: avoid_redundant_argument_values
           includeSettingsDocumentationArtifactHub: true);
       writeFakeManifest(example, isApp: true);
 
@@ -893,13 +857,8 @@ dependencies {
       expect(
         output,
         containsAllInOrder(<Matcher>[
-          contains(GradleCheckCommand.exampleSettingsArtifactHubStringGP),
+          contains(GradleCheckCommand.exampleSettingsArtifactHubString),
         ]),
-      );
-      expect(
-        output,
-        isNot(
-            contains(GradleCheckCommand.exampleRootSettingsArtifactHubString)),
       );
     });
 
@@ -911,9 +870,11 @@ dependencies {
       writeFakePluginBuildGradle(package, includeLanguageVersion: true);
       writeFakeManifest(package);
       final RepositoryPackage example = package.getExamples().first;
-      writeFakeExampleBuildGradleGP(example,
+      writeFakeExampleBuildGradles(example,
           pluginName: packageName,
+          // ignore: avoid_redundant_argument_values
           includeBuildArtifactHub: true,
+          // ignore: avoid_redundant_argument_values
           includeSettingsArtifactHub: true,
           includeSettingsDocumentationArtifactHub: false);
       writeFakeManifest(example, isApp: true);
